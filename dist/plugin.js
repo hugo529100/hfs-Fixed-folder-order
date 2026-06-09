@@ -1,5 +1,5 @@
-exports.version = 1.2
-exports.description = "Custom folder/file sorting with wildcard support. Allows fixed ordering, pinning items to top/bottom, and folder-first separation"
+exports.version = 1.4
+exports.description = "Custom folder/file sorting with wildcard support. Folders always first, with separate ordering for folders and files."
 exports.apiRequired = 8.87
 exports.repo = "Hug3O/Fixed-folder-order"
 exports.frontend_js = "main.js"
@@ -20,35 +20,18 @@ exports.config = {
         label: "Folder Order",
         multiline: true,
         frontend: true,
-        defaultValue: "Musics\nMovies\nYoutube\nAlbums\nBooks\nTools\nCloudDisk\nMycomputer\nHFS3",
+        defaultValue: "Musics\nMovies\nYoutube\nAlbums\nBooks\nTools",
         helperText:
-            "One folder/file per line. Supports wildcards (*).\nExample:\nMovie*\n*.mp4\nAnime\nMusic"
+            "Controls the order of FOLDERS.\nOne folder per line. Supports wildcards (*).\nFolders matching these patterns will be sorted by this list order.\nNon-matching folders will be sorted by HFS default order.\n\nExample:\nMovie*\nMusic\nAnime"
     },
 
-    alwaysFirst: {
+    fileOrder: {
         type: "string",
-        label: "Always First",
+        label: "File Order",
         multiline: true,
         frontend: true,
-        defaultValue: "*.mp3\n*.mp4\n*.jpeg\n*.jpg\n*.png\n*.stl\n*.dwg",
+        defaultValue: "*.mp4\n*.mp3\n*.jpeg\n*.jpg\n*.png\n*.pdf\n*.stl\n*.dwg\n*.txt\n*.htm\n*.html",
         helperText:
-            "These folders/files will always appear at the top.\nSupports wildcards (*).\nExample:\nImportant*\n*.txt\nTemp"
-    },
-
-    alwaysLast: {
-        type: "string",
-        label: "Always Last",
-        multiline: true,
-        frontend: true,
-        defaultValue: "temp\ncache\nBackup",
-        helperText:
-            "These folders/files will always appear at the bottom.\nSupports wildcards (*).\nExample:\nArchive*\n*.log\nBackup"
-    },
-
-    forceFoldersFirst: {
-        type: "boolean",
-        label: "Folders before files",
-        defaultValue: true,
-        frontend: true
+            "Controls the order of FILES.\nOne file pattern per line. Supports wildcards (*).\nFiles matching these patterns will be sorted by this list order.\nNon-matching files will be sorted by HFS default order.\n\nExample:\n*.mp4\n*.mp3\n*.jpg\n*.txt"
     }
 }
