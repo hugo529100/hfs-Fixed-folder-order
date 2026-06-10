@@ -1,5 +1,5 @@
 exports.version = 1.4
-exports.description = "Custom folder/file sorting with wildcard support. Folders always first, with separate ordering for folders and files."
+exports.description = "Folders always first with wildcard support. Separate custom ordering for folders and files, with case-insensitive matching."
 exports.apiRequired = 8.87
 exports.repo = "Hug3O/Fixed-folder-order"
 exports.frontend_js = "main.js"
