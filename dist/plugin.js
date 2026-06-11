@@ -1,8 +1,9 @@
-exports.version = 1.4
-exports.description = "Folders always first with wildcard support. Separate custom ordering for folders and files, with case-insensitive matching."
+exports.version = 1.5
+exports.description = "Folders first + DESCRIPT.ION comment tag ordering"
 exports.apiRequired = 8.87
 exports.repo = "Hug3O/Fixed-folder-order"
 exports.frontend_js = "main.js"
+
 exports.config = {
     scope: {
         type: "select",
@@ -20,9 +21,13 @@ exports.config = {
         label: "Folder Order",
         multiline: true,
         frontend: true,
-        defaultValue: "Musics\nMovies\nYoutube\nAlbums\nBooks\nTools",
-        helperText:
-            "Controls the order of FOLDERS.\nOne folder per line. Supports wildcards (*).\nFolders matching these patterns will be sorted by this list order.\nNon-matching folders will be sorted by HFS default order.\n\nExample:\nMovie*\nMusic\nAnime"
+        defaultValue:
+`Musics
+Movies
+Youtube
+Albums
+Books
+Tools`
     },
 
     fileOrder: {
@@ -30,8 +35,32 @@ exports.config = {
         label: "File Order",
         multiline: true,
         frontend: true,
-        defaultValue: "*.mp4\n*.mp3\n*.jpeg\n*.jpg\n*.png\n*.pdf\n*.stl\n*.dwg\n*.txt\n*.htm\n*.html",
+        defaultValue:
+`*.mp4
+*.mp3
+*.jpeg
+*.jpg
+*.png
+*.pdf`
+    },
+
+    commentOrderEnabled: {
+        type: "boolean",
+        label: "Enable DESCRIPT.ION Comment Sorting",
+        defaultValue: false,
+        frontend: true
+    },
+
+    commentOrder: {
+        type: "string",
+        label: "Comment Tags Order",
+        multiline: true,
+        frontend: true,
+        defaultValue:
+`top
+featured
+important`,
         helperText:
-            "Controls the order of FILES.\nOne file pattern per line. Supports wildcards (*).\nFiles matching these patterns will be sorted by this list order.\nNon-matching files will be sorted by HFS default order.\n\nExample:\n*.mp4\n*.mp3\n*.jpg\n*.txt"
+            "Sort entries according to tags found in DESCRIPT.ION comments."
     }
 }
