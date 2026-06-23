@@ -1,4 +1,4 @@
-exports.version = 1.5
+exports.version = 1.6
 exports.description = "Folders first + DESCRIPT.ION comment tag ordering"
 exports.apiRequired = 8.87
 exports.repo = "Hug3O/Fixed-folder-order"

@@ -150,17 +150,25 @@
     HFS.onEvent('sortCompare', ({ a, b }) => {
         if (!shouldHandle()) return 0
 
+        // 兼容快捷方式的文件名字段 (n 或 name)
+        const nameA = a.n || a.name || ''
+        const nameB = b.n || b.name || ''
+
+        // 兼容快捷方式的文件夹判断 (p: "d" 表示目录，或 isFolder 属性)
+        const isFolderA = !!(a.isFolder || a.p === 'd')
+        const isFolderB = !!(b.isFolder || b.p === 'd')
+
         // 1. FOLDER FIRST
-        if (a.isFolder && !b.isFolder) return -1
-        if (!a.isFolder && b.isFolder) return 1
+        if (isFolderA && !isFolderB) return -1
+        if (!isFolderA && isFolderB) return 1
 
         // 2. DESCRIPT.ION TAG ORDER（只有開啟時才生效）
         if (isCommentOrderEnabled()) {
             const tagPatterns = getPatternsFromConfig('commentOrder')
 
             if (tagPatterns.length > 0) {
-                const aTag = currentTags[a.name] || ''
-                const bTag = currentTags[b.name] || ''
+                const aTag = currentTags[nameA] || ''
+                const bTag = currentTags[nameB] || ''
 
                 const aTagPrefix = getTagPrefix(aTag)
                 const bTagPrefix = getTagPrefix(bTag)
@@ -187,12 +195,12 @@
         }
 
         // 3. FOLDER ORDER / FILE ORDER
-        const orderConfigKey = a.isFolder ? 'fixedOrder' : 'fileOrder'
+        const orderConfigKey = isFolderA ? 'fixedOrder' : 'fileOrder'
         const orderPatterns = getPatternsFromConfig(orderConfigKey)
 
         if (orderPatterns.length > 0) {
-            const aIndex = getFirstMatchingIndex(a.name, orderPatterns)
-            const bIndex = getFirstMatchingIndex(b.name, orderPatterns)
+            const aIndex = getFirstMatchingIndex(nameA, orderPatterns)
+            const bIndex = getFirstMatchingIndex(nameB, orderPatterns)
 
             const aInOrder = aIndex !== -1
             const bInOrder = bIndex !== -1
