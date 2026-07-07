@@ -2,6 +2,10 @@
 
 {
     let descriptionCache = {}
+    let refreshTimer = null
+    let pendingRefresh = null
+    let isFirstLoad = true
+    const DEBOUNCE_DELAY = 300
 
     function getConfig() {
         return HFS.getPluginConfig()
@@ -68,49 +72,69 @@
             return descriptionCache[currentPath]
         }
 
-        try {
-            let descUrl = currentPath
-            if (!descUrl.endsWith('/')) {
-                descUrl += '/'
+        if (pendingRefresh && pendingRefresh.path === currentPath) {
+            return pendingRefresh.promise
+        }
+
+        const promise = (async () => {
+            try {
+                let descUrl = currentPath
+                if (!descUrl.endsWith('/')) {
+                    descUrl += '/'
+                }
+                descUrl += 'DESCRIPT.ION'
+                
+                const response = await fetch(descUrl, {
+                    signal: AbortSignal.timeout(5000)
+                })
+                
+                if (!response.ok) {
+                    descriptionCache[currentPath] = {}
+                    return {}
+                }
+                
+                const content = await response.text()
+                const result = {}
+                const lines = content.split(/\r?\n/)
+                
+                for (const line of lines) {
+                    if (!line.trim()) continue
+                    
+                    const m =
+                        line.match(/^"([^"]+)"\s+(.+)$/) ||
+                        line.match(/^(\S[^\r\n]*?)\s+(.+)$/)
+
+                    if (!m) continue
+
+                    const filename = m[1].trim()
+                    const comment = m[2].trim()
+                    const tag = comment.split(/\s+/)[0]
+
+                    if (tag) {
+                        result[filename] = tag
+                    }
+                }
+                
+                descriptionCache[currentPath] = result
+                return result
             }
-            descUrl += 'DESCRIPT.ION'
-            
-            const response = await fetch(descUrl)
-            
-            if (!response.ok) {
+            catch (err) {
                 descriptionCache[currentPath] = {}
                 return {}
             }
-            
-            const content = await response.text()
-            const result = {}
-            const lines = content.split(/\r?\n/)
-            
-            for (const line of lines) {
-                if (!line.trim()) continue
-                
-                const m =
-                    line.match(/^"([^"]+)"\s+(.+)$/) ||
-                    line.match(/^(\S[^\r\n]*?)\s+(.+)$/)
-
-                if (!m) continue
-
-                const filename = m[1].trim()
-                const comment = m[2].trim()
-                const tag = comment.split(/\s+/)[0]
-
-                if (tag) {
-                    result[filename] = tag
+            finally {
+                if (pendingRefresh && pendingRefresh.path === currentPath) {
+                    pendingRefresh = null
                 }
             }
-            
-            descriptionCache[currentPath] = result
-            return result
+        })()
+
+        pendingRefresh = {
+            path: currentPath,
+            promise: promise
         }
-        catch (err) {
-            descriptionCache[currentPath] = {}
-            return {}
-        }
+
+        return promise
     }
 
     function getTagPrefix(tag) {
@@ -121,40 +145,65 @@
 
     let currentTags = {}
 
-    async function refreshTags() {
-        descriptionCache = {}
-        
-        // 只有開啟 commentOrder 時才讀取 DESCRIPT.ION
-        if (isCommentOrderEnabled()) {
-            currentTags = await loadDescriptionTags()
-        } else {
-            currentTags = {}
+    async function refreshTags(immediate = false) {
+        if (refreshTimer) {
+            clearTimeout(refreshTimer)
+            refreshTimer = null
         }
+
+        if (isFirstLoad || immediate) {
+            isFirstLoad = false
+            if (isCommentOrderEnabled()) {
+                currentTags = await loadDescriptionTags()
+            } else {
+                currentTags = {}
+                descriptionCache = {}
+            }
+            return
+        }
+
+        return new Promise((resolve) => {
+            refreshTimer = setTimeout(async () => {
+                if (isCommentOrderEnabled()) {
+                    currentTags = await loadDescriptionTags()
+                } else {
+                    currentTags = {}
+                    descriptionCache = {}
+                }
+                resolve()
+            }, DEBOUNCE_DELAY)
+        })
     }
 
-    HFS.watchState('uri', refreshTags, true)
-    HFS.onEvent('newListEntries', refreshTags)
+    HFS.watchState('uri', (uri) => {
+        isFirstLoad = true
+        refreshTags(true)
+    }, true)
+    
+    HFS.onEvent('newListEntries', () => {
+        refreshTags()
+    })
     
     if (typeof window !== 'undefined') {
         window.addEventListener('popstate', () => {
-            setTimeout(refreshTags, 100)
+            isFirstLoad = true
+            setTimeout(() => refreshTags(true), 100)
         })
         
         const originalPushState = history.pushState
         history.pushState = function() {
             originalPushState.apply(this, arguments)
-            setTimeout(refreshTags, 100)
+            isFirstLoad = true
+            setTimeout(() => refreshTags(true), 100)
         }
     }
 
     HFS.onEvent('sortCompare', ({ a, b }) => {
         if (!shouldHandle()) return 0
 
-        // 兼容快捷方式的文件名字段 (n 或 name)
         const nameA = a.n || a.name || ''
         const nameB = b.n || b.name || ''
 
-        // 兼容快捷方式的文件夹判断 (p: "d" 表示目录，或 isFolder 属性)
         const isFolderA = !!(a.isFolder || a.p === 'd')
         const isFolderB = !!(b.isFolder || b.p === 'd')
 
@@ -162,7 +211,7 @@
         if (isFolderA && !isFolderB) return -1
         if (!isFolderA && isFolderB) return 1
 
-        // 2. DESCRIPT.ION TAG ORDER（只有開啟時才生效）
+        // 2. DESCRIPT.ION TAG ORDER
         if (isCommentOrderEnabled()) {
             const tagPatterns = getPatternsFromConfig('commentOrder')
 
@@ -179,16 +228,13 @@
                 const aHasTag = aTagIndex !== -1
                 const bHasTag = bTagIndex !== -1
 
-                // 有 tag 的排在沒 tag 的前面
                 if (aHasTag && !bHasTag) return -1
                 if (!aHasTag && bHasTag) return 1
 
-                // 兩個都有 tag，按 tag 類型排序
                 if (aHasTag && bHasTag) {
                     if (aTagIndex !== bTagIndex) {
                         return aTagIndex - bTagIndex
                     }
-                    // 同一 tag 類型，交由 HFS 原生排序
                     return 0
                 }
             }
