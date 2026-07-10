@@ -1,12 +1,6 @@
 'use strict';
 
 {
-    let descriptionCache = {}
-    let refreshTimer = null
-    let pendingRefresh = null
-    let isFirstLoad = true
-    const DEBOUNCE_DELAY = 300
-
     function getConfig() {
         return HFS.getPluginConfig()
     }
@@ -47,155 +41,10 @@
         return cfg.commentOrderEnabled === true
     }
 
-    function getCurrentPath() {
-        let path = '/'
-        
-        if (typeof window !== 'undefined' && window.location) {
-            path = window.location.pathname || '/'
-        }
-        
-        if (!path || path === '/') {
-            path = HFS.state.uri || '/'
-        }
-        
-        if (!path.startsWith('/')) {
-            path = '/' + path
-        }
-        
-        return path
-    }
-
-    async function loadDescriptionTags() {
-        const currentPath = getCurrentPath()
-        
-        if (descriptionCache[currentPath]) {
-            return descriptionCache[currentPath]
-        }
-
-        if (pendingRefresh && pendingRefresh.path === currentPath) {
-            return pendingRefresh.promise
-        }
-
-        const promise = (async () => {
-            try {
-                let descUrl = currentPath
-                if (!descUrl.endsWith('/')) {
-                    descUrl += '/'
-                }
-                descUrl += 'DESCRIPT.ION'
-                
-                const response = await fetch(descUrl, {
-                    signal: AbortSignal.timeout(5000)
-                })
-                
-                if (!response.ok) {
-                    descriptionCache[currentPath] = {}
-                    return {}
-                }
-                
-                const content = await response.text()
-                const result = {}
-                const lines = content.split(/\r?\n/)
-                
-                for (const line of lines) {
-                    if (!line.trim()) continue
-                    
-                    const m =
-                        line.match(/^"([^"]+)"\s+(.+)$/) ||
-                        line.match(/^(\S[^\r\n]*?)\s+(.+)$/)
-
-                    if (!m) continue
-
-                    const filename = m[1].trim()
-                    const comment = m[2].trim()
-                    const tag = comment.split(/\s+/)[0]
-
-                    if (tag) {
-                        result[filename] = tag
-                    }
-                }
-                
-                descriptionCache[currentPath] = result
-                return result
-            }
-            catch (err) {
-                descriptionCache[currentPath] = {}
-                return {}
-            }
-            finally {
-                if (pendingRefresh && pendingRefresh.path === currentPath) {
-                    pendingRefresh = null
-                }
-            }
-        })()
-
-        pendingRefresh = {
-            path: currentPath,
-            promise: promise
-        }
-
-        return promise
-    }
-
     function getTagPrefix(tag) {
         if (!tag) return ''
         const match = tag.match(/^(.+?)(\d*)$/)
         return match ? match[1] : tag
-    }
-
-    let currentTags = {}
-
-    async function refreshTags(immediate = false) {
-        if (refreshTimer) {
-            clearTimeout(refreshTimer)
-            refreshTimer = null
-        }
-
-        if (isFirstLoad || immediate) {
-            isFirstLoad = false
-            if (isCommentOrderEnabled()) {
-                currentTags = await loadDescriptionTags()
-            } else {
-                currentTags = {}
-                descriptionCache = {}
-            }
-            return
-        }
-
-        return new Promise((resolve) => {
-            refreshTimer = setTimeout(async () => {
-                if (isCommentOrderEnabled()) {
-                    currentTags = await loadDescriptionTags()
-                } else {
-                    currentTags = {}
-                    descriptionCache = {}
-                }
-                resolve()
-            }, DEBOUNCE_DELAY)
-        })
-    }
-
-    HFS.watchState('uri', (uri) => {
-        isFirstLoad = true
-        refreshTags(true)
-    }, true)
-    
-    HFS.onEvent('newListEntries', () => {
-        refreshTags()
-    })
-    
-    if (typeof window !== 'undefined') {
-        window.addEventListener('popstate', () => {
-            isFirstLoad = true
-            setTimeout(() => refreshTags(true), 100)
-        })
-        
-        const originalPushState = history.pushState
-        history.pushState = function() {
-            originalPushState.apply(this, arguments)
-            isFirstLoad = true
-            setTimeout(() => refreshTags(true), 100)
-        }
     }
 
     HFS.onEvent('sortCompare', ({ a, b }) => {
@@ -216,8 +65,9 @@
             const tagPatterns = getPatternsFromConfig('commentOrder')
 
             if (tagPatterns.length > 0) {
-                const aTag = currentTags[nameA] || ''
-                const bTag = currentTags[nameB] || ''
+                // 直接使用 HFS 原生提供的 comment 屬性
+                const aTag = a.comment || ''
+                const bTag = b.comment || ''
 
                 const aTagPrefix = getTagPrefix(aTag)
                 const bTagPrefix = getTagPrefix(bTag)
