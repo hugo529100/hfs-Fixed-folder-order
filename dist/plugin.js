@@ -38,8 +38,7 @@ Tools`
         defaultValue:
 `*.mp4
 *.mp3
-*.jpeg
-*.jpg
+*.jp*g
 *.png
 *.pdf`
     },
